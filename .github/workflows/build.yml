@@ -1,0 +1,40 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+
+      - name: Firma fija (permite actualizar sobre la versión anterior)
+        run: |
+          mkdir -p ~/.android
+          cp debug.keystore ~/.android/debug.keystore
+
+      - name: Compilar APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Publicar en Releases (enlace fijo de descarga)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk app.apk
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest app.apk --title "Última versión" --notes "APK generado automáticamente del commit ${GITHUB_SHA::7}"
